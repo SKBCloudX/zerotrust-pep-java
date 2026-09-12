@@ -1,0 +1,150 @@
+# Copyright 2026 SK Broadband Co., Ltd.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Runs the full suite against every Spring combination the README claims to support.
+#
+# The claim is the point. A compatibility table is worth nothing unless something re-checks
+# it, and this library's whole delivery story rests on customers being able to drop it into
+# whichever Spring generation they already run. Adding a row to the README means adding a row
+# here first; if it cannot pass, the README does not get the row.
+#
+# Releases are deliberately not automated. A version published to Maven Central can never be
+# modified or withdrawn, so it stays a decision someone makes on purpose.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Boot ${{ matrix.boot }} / Cloud ${{ matrix.cloud }} / Java ${{ matrix.java }}
+    runs-on: ubuntu-latest
+    strategy:
+      # Run every combination even after one fails. Knowing it broke on exactly one row is
+      # most of the diagnosis.
+      fail-fast: false
+      matrix:
+        include:
+          # Current generation.
+          - boot: 3.3.5
+            cloud: 2023.0.3
+            java: 17
+          # Forward check: Boot 3.3 supports 21, and finding out here beats finding out from
+          # a customer who upgraded their runtime.
+          - boot: 3.3.5
+            cloud: 2023.0.3
+            java: 21
+          # Previous generation. Java 17 only — class files target 17, so Boot 2 on Java 8
+          # or 11 cannot load them at all and there is nothing to test there.
+          - boot: 2.7.18
+            cloud: 2021.0.9
+            java: 17
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+
+      # `clean` is deliberate. Running `package` and then `test` against the same target/
+      # produced a dozen failures that looked like a real defect in the deny path — every
+      # test expecting a denial timed out — and vanished on a clean build. CI gets a fresh
+      # checkout anyway, but stating it keeps the command copy-pastable for anyone
+      # reproducing a failure locally.
+      - name: Test
+        run: >
+          ./mvnw -B clean test
+          -Dspring-boot.version=${{ matrix.boot }}
+          -Dspring-cloud.version=${{ matrix.cloud }}
+
+      # A passing suite proves nothing if the override silently did not apply and every row
+      # quietly tested the same versions. Fail loudly instead.
+      - name: Confirm the matrix row actually resolved
+        run: |
+          ./mvnw -B dependency:list \
+            -Dspring-boot.version=${{ matrix.boot }} \
+            -Dspring-cloud.version=${{ matrix.cloud }} \
+            -DoutputFile=resolved.txt -q
+          echo "--- resolved Spring artifacts ---"
+          grep -E "spring-boot-starter-webflux|spring-cloud-starter-gateway" resolved.txt || true
+          grep -q "spring-boot-starter-webflux:jar:${{ matrix.boot }}" resolved.txt || {
+            echo "::error::Spring Boot did not resolve to ${{ matrix.boot }} — this row tested the wrong versions"
+            exit 1
+          }
+
+  no-runtime-dependencies:
+    name: No runtime dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      # The README tells adopters this library adds nothing to their classpath, and their
+      # procurement review leans on NOTICE staying almost empty. Both quietly stop being true
+      # the first time someone adds a convenient dependency, so assert it rather than trust it.
+      - name: Assert the dependency list is empty
+        run: |
+          ./mvnw -B -q clean dependency:list -DincludeScope=runtime -DoutputFile=runtime-deps.txt
+          if grep -qE "^ +[^ ]+:[^ ]+:[^ ]+:" runtime-deps.txt; then
+            echo "::error::This library must ship with no runtime dependencies. Found:"
+            grep -E "^ +[^ ]+:[^ ]+:[^ ]+:" runtime-deps.txt
+            echo "Spring APIs belong in provided scope. If a dependency is unavoidable, shade and relocate it."
+            exit 1
+          fi
+          echo "No runtime dependencies."
+
+  publishable:
+    name: Publishable artifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: maven
+
+      # Maven Central rejects a bundle missing sources or javadoc, and it rejects it at
+      # publish time — the worst moment to discover a build problem, because the release is
+      # already in motion.
+      - name: Build the jars Central requires
+        run: ./mvnw -B -DskipTests clean package
+
+      - name: Assert sources and javadoc are attached
+        run: |
+          ls -1 target/*.jar
+          for suffix in "" "-sources" "-javadoc"; do
+            if ! ls target/*"$suffix".jar >/dev/null 2>&1; then
+              echo "::error::missing ${suffix:-main} jar; Central will reject the bundle"
+              exit 1
+            fi
+          done
+
+      # Licence files are easy to lose in a refactor and impossible to add retroactively to a
+      # published version.
+      - name: Assert licence files and SPDX headers are present
+        run: |
+          test -f LICENSE || { echo "::error::LICENSE missing"; exit 1; }
+          test -f NOTICE  || { echo "::error::NOTICE missing"; exit 1; }
+          missing=0
+          while IFS= read -r f; do
+            head -2 "$f" | grep -q "SPDX-License-Identifier: Apache-2.0" || {
+              echo "::error file=$f::missing SPDX header"; missing=1;
+            }
+          done < <(find src -name '*.java')
+          exit $missing

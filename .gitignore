@@ -1,0 +1,23 @@
+# 빌드 산출물
+target/
+
+# 키·인증서·서명 — 공개 저장소이므로 실수로 들어가면 회수할 수 없다
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+*.asc
+*.gpg
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db

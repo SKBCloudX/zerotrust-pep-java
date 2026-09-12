@@ -1,0 +1,8 @@
+# Spring Boot 2.x reads this file; Boot 3 reads
+# META-INF/spring/...AutoConfiguration.imports instead and ignores the entry below.
+#
+# Shipping this costs nothing, but it is NOT a claim that Boot 2 works: class files target
+# Java 17, so a Boot 2 application on Java 8 or 11 cannot load them, and nothing here has
+# been run on Boot 2. See the README.
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+com.skbroadband.zerotrust.pep.PepAutoConfiguration

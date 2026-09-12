@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Copyright 2026 SK Broadband Co., Ltd.
+  SPDX-License-Identifier: Apache-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.skbroadband</groupId>
+  <artifactId>zerotrust-pep-spring-boot-starter</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>zerotrust-pep-spring-boot-starter</name>
+  <description>Policy enforcement client for the ICAM decision API.
+    Registers a Spring Cloud Gateway filter that authorizes each request
+    and fails closed when no decision is available.</description>
+  <url>https://github.com/SKBCloudX/zerotrust-pep-java</url>
+
+  <licenses>
+    <license>
+      <name>The Apache License, Version 2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+    </license>
+  </licenses>
+
+  <!-- 개인 이메일을 넣지 않는다 — Central 은 게시본을 못 지우므로 연락처가 영구히 공개된다. -->
+  <developers>
+    <developer>
+      <organization>SK Broadband Co., Ltd.</organization>
+      <organizationUrl>https://www.skbroadband.com</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/SKBCloudX/zerotrust-pep-java.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/SKBCloudX/zerotrust-pep-java.git</developerConnection>
+    <url>https://github.com/SKBCloudX/zerotrust-pep-java</url>
+  </scm>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!--
+      고객마다 Spring 판이 다르다. 아래 두 값은 **빌드·시험용**이며, provided scope 이므로
+      소비자에게 전파되지 않는다. 고객은 자기 판을 그대로 쓴다.
+    -->
+    <spring-boot.version>3.3.5</spring-boot.version>
+    <spring-cloud.version>2023.0.3</spring-cloud.version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-dependencies</artifactId>
+        <version>${spring-boot.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.springframework.cloud</groupId>
+        <artifactId>spring-cloud-dependencies</artifactId>
+        <version>${spring-cloud.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <!--
+      전부 provided 다. 런타임 의존을 0 으로 유지하는 이유가 셋이다:
+        보안  — compile scope 의존은 전 고객이 떠안는 공급망 부담이 된다
+        호환  — 고객 스택의 판과 충돌하지 않는다
+        조달  — NOTICE 가 비어 OSS 심사가 가장 쉽게 지나간다
+      새 의존을 추가하기 전에 이 셋을 다시 볼 것. 불가피하면 shade + relocate.
+    -->
+    <dependency>
+      <groupId>org.springframework.cloud</groupId>
+      <artifactId>spring-cloud-starter-gateway</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <!--
+      An annotation processor: it generates configuration metadata at build time and is not
+      needed at runtime. Declared `provided` rather than `optional` so that
+      `dependency:list -DincludeScope=runtime` comes back genuinely empty — CI asserts on
+      that, and a check that has to tolerate one known entry stops catching the next one.
+    -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-configuration-processor</artifactId>
+      <scope>provided</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- Central 은 sources·javadoc jar 이 없으면 게시를 거부한다. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals><goal>jar-no-fork</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals><goal>jar</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <!--
+      Signing runs only when releasing.
+
+      It used to run on every build, which meant anyone who cloned the repository and ran
+      `mvn install` hit "gpg: no default secret key" and could get no further. A contributor
+      should be able to build and test without holding the release key — in fact they must
+      not hold it.
+
+      The key belongs in CI's protected credentials, never on a workstation. If it leaks,
+      malicious artifacts can be published under our name, and a published version can never
+      be withdrawn.
+    -->
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals><goal>sign</goal></goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>
