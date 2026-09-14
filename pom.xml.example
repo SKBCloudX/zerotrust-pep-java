@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 
+  Example pom.xml snippet for integrating zerotrust-pep-spring-boot-starter 
+  into host Spring Cloud Gateway (e.g. app-api-gateway).
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.skb.cloudpc.application</groupId>
+  <artifactId>example-gateway</artifactId>
+  <version>1.0.0</version>
+
+  <dependencies>
+    <!-- Option A: Standard Maven Repository / Central dependency -->
+    <dependency>
+      <groupId>com.skbroadband</groupId>
+      <artifactId>zerotrust-pep-spring-boot-starter</artifactId>
+      <version>1.0.0</version>
+    </dependency>
+
+    <!-- Option B: Direct local JAR file dependency (Use before Central publication) -->
+    <!--
+    <dependency>
+      <groupId>com.skbroadband</groupId>
+      <artifactId>zerotrust-pep-spring-boot-starter</artifactId>
+      <version>1.0.0</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/lib/zerotrust-pep-spring-boot-starter-1.0.0.jar</systemPath>
+    </dependency>
+    -->
+  </dependencies>
+</project>

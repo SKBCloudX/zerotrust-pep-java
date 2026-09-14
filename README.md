@@ -10,10 +10,20 @@ point change its policy engine without this library caring, and lets one deploym
 it somewhere else entirely.
 
 ```xml
+<!-- 1. Standard Maven Central / Repository dependency -->
 <dependency>
   <groupId>com.skbroadband</groupId>
   <artifactId>zerotrust-pep-spring-boot-starter</artifactId>
   <version>1.0.0</version>
+</dependency>
+
+<!-- 2. Local file system dependency (before Maven Central release) -->
+<dependency>
+  <groupId>com.skbroadband</groupId>
+  <artifactId>zerotrust-pep-spring-boot-starter</artifactId>
+  <version>1.0.0</version>
+  <scope>system</scope>
+  <systemPath>${project.basedir}/lib/zerotrust-pep-spring-boot-starter-1.0.0.jar</systemPath>
 </dependency>
 ```
 
